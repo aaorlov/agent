@@ -1,27 +1,36 @@
-import { serve } from "@hono/node-server";
-import { Hono } from "hono";
-import { corsMiddleware } from "./middleware/cors.js";
-import { health } from "./routes/health.js";
-import { chat } from "./routes/chat.js";
+import { env } from "./config";
+import { app } from "./app";
 
-const app = new Hono();
+// === RUNTIME DETECTION ===
 
-// Global middleware
-app.use("*", corsMiddleware);
+function getRuntime(): { name: string; version: string } {
+  if (typeof Bun !== "undefined") {
+    return { name: "Bun", version: Bun.version };
+  }
+  if (typeof process !== "undefined" && process.versions?.node) {
+    return { name: "Node.js", version: process.versions.node };
+  }
+  return { name: "Unknown", version: "unknown" };
+}
 
-// Mount route modules
-app.route("/health", health);
-app.route("/api/chat", chat);
+const runtime = getRuntime();
 
-// Start the server
-const port = Number(process.env.PORT) || 3000;
+// === START SERVER ===
 
-serve({
-  fetch: app.fetch,
-  port,
-});
+console.log(`
+╔═══════════════════════════════════════════════════════╗
+║           🚀 Prism Invest API (Hono)                  ║
+╠═══════════════════════════════════════════════════════╣
+║  Server:    http://localhost:${String(env.PORT).padEnd(5)}                  ║
+║  Mode:      ${env.ENV.padEnd(12)}                         ║
+║  Runtime:   ${runtime.name} ${runtime.version.padEnd(15)}              ║
+╚═══════════════════════════════════════════════════════╝
+`);
 
-console.log(`🚀 Server is running on http://localhost:${port}`);
-console.log(`📡 SSE endpoint: POST http://localhost:${port}/api/chat/stream`);
-console.log(`💬 Chat endpoint: POST http://localhost:${port}/api/chat`);
-console.log(`❤️  Health check: GET http://localhost:${port}/health`);
+export default {
+  port: env.PORT,
+  fetch(req: Request) {
+    return app.fetch(req);
+  },
+};
+

@@ -1,0 +1,2 @@
+export { health } from "./routes";
+

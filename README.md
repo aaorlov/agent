@@ -1,4 +1,4 @@
-# Prism Invest AI Agent
+# AI Agent
 
 A Hono server with Zod validation and LangGraph integration for AI agent communication via SSE (Server-Sent Events).
 

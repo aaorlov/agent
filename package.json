@@ -1,35 +1,30 @@
 {
-  "name": "prism-invest-agent",
+  "name": "ai-agent",
   "version": "1.0.0",
   "description": "AI Agent server with Hono, Zod, and LangGraph",
   "type": "module",
-  "main": "dist/index.js",
+  "private": true,
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "type-check": "tsc --noEmit"
+    "dev": "ENV=dev bun run --hot src/index.ts",
+    "start": "ENV=dev bun run src/index.ts",
+    "start:node": "node --experimental-strip-types src/index.ts",
+    "build": "bun build src/index.ts --outdir ./dist --target bun",
+    "lint": "bunx @biomejs/biome check --write .",
+    "test": "bun test"
   },
-  "keywords": [
-    "hono",
-    "zod",
-    "langgraph",
-    "ai",
-    "agent",
-    "sse"
-  ],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "@hono/node-server": "^1.12.0",
-    "@langchain/langgraph": "^0.2.16",
+    "@hono/standard-validator": "^0.2.1",
+    "@hono/zod-validator": "^0.7.6",
     "@langchain/core": "^0.3.15",
-    "hono": "^4.6.3",
-    "zod": "^3.23.8"
+    "@langchain/langgraph": "^0.2.16",
+    "@scalar/hono-api-reference": "^0.9.30",
+    "hono": "^4.11.3",
+    "hono-openapi": "^1.1.2",
+    "zod": "^4.2.1"
   },
   "devDependencies": {
-    "@types/node": "^22.7.5",
-    "tsx": "^4.19.1",
-    "typescript": "^5.6.3"
+    "@types/bun": "^1.1.14",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
   }
 }
