@@ -22,7 +22,7 @@ async function toAgentInput(
     messages: [],
   }
 
-  const lastToolResult = body.messages.at(-1)?.parts.find((p) => p.type === MessagePartType.ToolResult);
+  const lastToolResult: AgentResume | undefined = body.messages.at(-1)?.parts.find((p) => p.type === MessagePartType.ToolResult);
   
   // Agent will use resume command and restore messages from the checkpoint
   if (lastToolResult) {
