@@ -1,9 +1,10 @@
 import { ChatAnthropic } from "@langchain/anthropic";
-import { SystemMessage, BaseMessage } from "@langchain/core/messages";
-import { interrupt } from "@langchain/langgraph";
+import { SystemMessage, BaseMessage, AIMessageChunk } from "@langchain/core/messages";
+import { interrupt, LangGraphRunnableConfig } from "@langchain/langgraph";
+import { concat } from '@langchain/core/utils/stream';
 import { AgentState } from "./state";
 import { AgentResume } from "./types";
-import { AgentStatusPhase, MessageRole, ToolAction } from "./enums";
+import { AgentStatusPhase, CustomEventType, MessageRole, ToolAction } from "./enums";
 import { env } from "@/config";
 import { toLC } from "./utils";
 
@@ -12,9 +13,7 @@ const llm = new ChatAnthropic({
   apiKey: env.ANTROPIC_API_KEY,
 });
 
-export async function callModel(
-  state: AgentState
-): Promise<Partial<AgentState>> {
+export const callModel = async (state: AgentState, config: LangGraphRunnableConfig): Promise<Partial<AgentState>> => {
   const messages: BaseMessage[] = [];
 
   if (state.systemPrompt) {
@@ -25,16 +24,20 @@ export async function callModel(
     messages.push(toLC(m));
   }
 
-  const response = await llm.invoke(messages);
-  const content =
-    typeof response.content === "string"
-      ? response.content
-      : JSON.stringify(response.content);
+  let fullMessage: AIMessageChunk | undefined;
+  const llmStream = await llm.stream(messages);
+  for await (const chunk of llmStream) {
+    fullMessage = fullMessage ? concat(fullMessage, chunk) : chunk;
 
+    if(chunk.content) config.writer?.({ type: CustomEventType.TextDelta, content: chunk.content, messageId: fullMessage.id });
+  }
+
+  const content = typeof fullMessage?.content === "string" ? fullMessage.content : fullMessage ? JSON.stringify(fullMessage.content) : "";
+  
   return {
     messages: [
       {
-        id: crypto.randomUUID(),
+        id: fullMessage?.id ?? crypto.randomUUID(),
         role: MessageRole.Assistant,
         content,
       },
@@ -42,76 +45,3 @@ export async function callModel(
   };
 }
 
-/**
- * Stub: creates an assistant message with a tool call that requires approval.
- * Replace with real LLM + tool-binding logic.
- */
-export async function executeTool(
-  state: AgentState
-): Promise<Partial<AgentState>> {
-  const toolCallId = crypto.randomUUID();
-  const toolName = "example_approval_tool";
-  const args = { message: "Executing tool" };
-
-  return {
-    status: AgentStatusPhase.Executing,
-    pendingTools: [{ toolCallId, toolName, args, requiresApproval: true }],
-    messages: [
-      {
-        id: crypto.randomUUID(),
-        role: MessageRole.Assistant,
-        content: "",
-        toolCalls: [{ toolCallId, toolName, args, requiresApproval: true }],
-      },
-    ],
-  };
-}
-
-/**
- * Interrupt for human approval, then append a ToolMessage with the resolution.
- */
-export async function requestApproval(
-  state: AgentState
-): Promise<Partial<AgentState>> {
-  const pending = state.pendingTools;
-  if (!pending.length) {
-    return { status: null, pendingTools: [] };
-  }
-
-  const tool = pending[0];
-  const resumeValue = interrupt({
-    toolCallId: tool.toolCallId,
-    toolName: tool.toolName,
-    args: tool.args,
-  }) as AgentResume | undefined;
-
-  return {
-    status: AgentStatusPhase.ToolResult,
-    pendingTools: [],
-    messages: [
-      {
-        id: crypto.randomUUID(),
-        role: MessageRole.Tool,
-        toolCallId: tool.toolCallId,
-        toolName: tool.toolName,
-        result: resumeValue?.modifiedArgs ?? {},
-        action: resumeValue?.action ?? ToolAction.Approved,
-      },
-    ],
-  };
-}
-
-export async function respond(
-  state: AgentState
-): Promise<Partial<AgentState>> {
-  return {
-    status: null,
-    messages: [
-      {
-        id: crypto.randomUUID(),
-        role: MessageRole.Assistant,
-        content: "Response based on conversation and tool results.",
-      },
-    ],
-  };
-}

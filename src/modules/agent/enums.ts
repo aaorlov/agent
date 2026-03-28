@@ -25,3 +25,7 @@ export enum AgentStatusPhase {
   Executing = "executing",
   ToolResult = "tool_result",
 }
+
+export enum CustomEventType {
+  TextDelta = "text-delta"
+}

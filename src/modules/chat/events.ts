@@ -24,8 +24,8 @@ export enum FinishReason {
 export type SSEEvent =
   | { type: SSEEventType.Session; threadId: string }
   | { type: SSEEventType.Status; code: AgentStatusPhase; message: string }
-  | { type: SSEEventType.TextDelta; content: string; messageId?: string }
-  | { type: SSEEventType.TextEnd; messageId?: string }
+  | { type: SSEEventType.TextDelta; content: string; messageId: string }
+  | { type: SSEEventType.TextEnd; content: string; messageId: string }
   | {
       type: SSEEventType.ToolCall;
       toolCallId: string;

@@ -1,6 +1,6 @@
 import { AIMessageChunk } from "@langchain/core/messages";
 import { AgentState } from "./state";
-import { MessageRole, ToolAction } from "./enums";
+import { MessageRole, ToolAction, CustomEventType } from "./enums";
 
 // ---------------------------------------------------------------------------
 // Messages — discriminated union on `role`
@@ -83,6 +83,14 @@ export interface AgentRunInput {
   resume?: AgentResume;
 }
 
+export interface CustomTextDelta {
+  type: CustomEventType.TextDelta;
+  content: string;
+  messageId: string;
+}
+
+export type CustomEventData = CustomTextDelta;
+
 export type AgentStreamEvent =
   | { mode: "updates"; data: Record<string, Partial<AgentState>> }
-  | { mode: "messages"; data: [AIMessageChunk, { langgraph_node: string }] };
+  | { mode: "custom"; data: CustomEventData };

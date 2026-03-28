@@ -23,7 +23,6 @@ export { AgentStateAnnotation, type AgentState } from "./state";
 export {
   agentGraph,
   streamAgent,
-  toGraphInput,
   getThreadState,
   type AgentGraph,
 } from "./graph";

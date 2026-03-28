@@ -1,11 +1,12 @@
 import type { SSEStreamingApi } from "hono/streaming";
 import { streamAgent, MessageRole, AgentStatusPhase } from "@/modules/agent";
+import { CustomEventType } from "@/modules/agent/enums";
+import type { CustomEventData } from "@/modules/agent/types";
 import type {
   AgentState,
   AgentRunInput,
   AgentMessage,
-  AssistantMessage,
-  ToolMessage,
+  AssistantMessage
 } from "@/modules/agent";
 
 import type { ChatRequest } from "./schemas";
@@ -18,33 +19,38 @@ import { sseEventToMessage } from "./utils";
 // Request → AgentRunInput
 // ---------------------------------------------------------------------------
 
-async function toAgentInput(
+const toAgentInput = (
   threadId: string,
   body: ChatRequest
-): Promise<AgentRunInput> {
-  if (body.type === ChatRequestType.ToolAction) {
-    return {
-      threadId,
-      messages: [],
-      resume: {
+): AgentRunInput => {
+  const agentInput: AgentRunInput = {
+    threadId,
+    messages: [],
+  };
+  switch(body.type) {
+    case ChatRequestType.ToolAction:
+      agentInput.resume = {
         toolCallId: body.toolCallId,
         action: body.action,
         modifiedArgs: body.modifiedArgs,
-      },
-    };
+      };
+      break;
+    case ChatRequestType.Message:
+      agentInput.messages.push({
+        id: crypto.randomUUID(),
+        role: MessageRole.Human,
+        content: body.content,
+      });
+      break;
+    default:
+      throw new Error(`Invalid chat request type: ${body}`);
   }
 
-  const humanMessage: AgentMessage = {
-    id: crypto.randomUUID(),
-    role: MessageRole.Human,
-    content: body.content,
-  };
-
-  return { threadId, messages: [humanMessage] };
+  return agentInput;
 }
 
 // ---------------------------------------------------------------------------
-// Agent state chunk → SSE events
+// Agent state updates → SSE events
 // ---------------------------------------------------------------------------
 
 const STATUS_LABELS: Record<AgentStatusPhase, string> = {
@@ -54,14 +60,11 @@ const STATUS_LABELS: Record<AgentStatusPhase, string> = {
   [AgentStatusPhase.ToolResult]: "Tool result",
 };
 
-function* chunkToSSEEvents(
-  chunk: Record<string, Partial<AgentState>>,
-  options?: { textStreamedNodes?: Set<string> }
+function* updateAgentStateToSSEEvents(
+  chunk: Record<string, Partial<AgentState>>
 ): Generator<SSEEvent> {
   for (const [nodeName, u] of Object.entries(chunk)) {
     if (!u || typeof u !== "object") continue;
-
-    const textAlreadyStreamed = options?.textStreamedNodes?.has(nodeName);
 
     if (u.status) {
       yield {
@@ -113,35 +116,42 @@ function* chunkToSSEEvents(
             }
           }
 
-          if (!textAlreadyStreamed && am.content) {
+          if (am.content) {
             yield {
-              type: SSEEventType.TextDelta,
+              type: SSEEventType.TextEnd,
               messageId: am.id,
               content: am.content,
             };
           }
-
-          if (am.content || textAlreadyStreamed) {
-            yield { type: SSEEventType.TextEnd, messageId: am.id };
-          }
         }
 
         if (msg.role === MessageRole.Tool) {
-          const tm = msg as ToolMessage;
           yield {
             type: SSEEventType.ToolResult,
-            toolCallId: tm.toolCallId,
-            toolName: tm.toolName,
-            action: tm.action,
-            result: tm.result,
-            error: tm.error,
+            toolCallId: msg.toolCallId,
+            toolName: msg.toolName,
+            action: msg.action,
+            result: msg.result,
+            error: msg.error,
           };
         }
       }
     }
   }
 }
-
+// ---------------------------------------------------------------------------
+// Custom events → SSE events
+// ---------------------------------------------------------------------------
+function customEventToSSEEvent(
+  event: CustomEventData
+): SSEEvent | null {
+  switch(event.type) {
+    case CustomEventType.TextDelta:
+      return { type: SSEEventType.TextDelta, content: event.content, messageId: event.messageId };
+    default:
+      return null;
+  }
+}
 // ---------------------------------------------------------------------------
 // Public streaming generators
 // ---------------------------------------------------------------------------
@@ -155,20 +165,16 @@ export async function* streamChatEvents(
 
   try {
     let hadApprovalRequest = false;
-    const textStreamedNodes = new Set<string>();
 
     for await (const event of streamAgent(input, { signal })) {
-      if (event.mode === "messages") {
-        const [chunk, meta] = event.data;
-        const text = typeof chunk.content === "string" ? chunk.content : "";
-        if (text) {
-          textStreamedNodes.add(meta.langgraph_node);
-          yield { type: SSEEventType.TextDelta, content: text };
-        }
-      } else {
-        for (const ev of chunkToSSEEvents(event.data, { textStreamedNodes })) {
-          if (ev.type === SSEEventType.ApprovalRequired)
-            hadApprovalRequest = true;
+      if (event.mode === "custom") {
+        const sseEvent = customEventToSSEEvent(event.data);
+        console.log("custom event", sseEvent);
+        if(sseEvent) yield sseEvent;
+      } 
+      if(event.mode === "updates") {
+        for (const ev of updateAgentStateToSSEEvents(event.data)) {
+          if (ev.type === SSEEventType.ApprovalRequired) hadApprovalRequest = true;
           yield ev;
         }
       }
