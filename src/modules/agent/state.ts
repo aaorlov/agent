@@ -27,18 +27,6 @@ export const AgentStateAnnotation = Annotation.Root({
     default: () => null,
   }),
 
-  /** Streaming text delta (transient). */
-  textDelta: Annotation<string>({
-    reducer: (_, right) => right ?? "",
-    default: () => "",
-  }),
-
-  /** ID of the assistant message currently being streamed. Set alongside textDelta. */
-  currentMessageId: Annotation<string>({
-    reducer: (_, right) => right ?? "",
-    default: () => "",
-  }),
-
   /** Incremented each agent iteration. Use to cap max steps. */
   steps: Annotation<number>({
     reducer: (left, right) => (right === 0 ? 0 : left + right),

@@ -15,7 +15,7 @@ export type {
   AgentResume,
   PendingTool,
   RetrievedDocument,
-  AgentStreamChunk,
+  AgentStreamEvent
 } from "./types";
 
 export { AgentStateAnnotation, type AgentState } from "./state";

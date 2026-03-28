@@ -39,7 +39,9 @@ const envSchema = z.object({
     .string()
     .default("8000")
     .transform((val) => parseInt(val, 10))
-    .pipe(z.number().positive())
+    .pipe(z.number().positive()),
+  ANTROPIC_API_KEY: z.string(),
+  ANTROPIC_MODEL: z.string(),
 });
 
 export type Env = z.infer<typeof envSchema>;

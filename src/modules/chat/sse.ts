@@ -1,9 +1,9 @@
 import type { SSEStreamingApi } from "hono/streaming";
 import { streamAgent, MessageRole, AgentStatusPhase } from "@/modules/agent";
 import type {
-  AgentMessage,
   AgentState,
   AgentRunInput,
+  AgentMessage,
   AssistantMessage,
   ToolMessage,
 } from "@/modules/agent";
@@ -55,10 +55,13 @@ const STATUS_LABELS: Record<AgentStatusPhase, string> = {
 };
 
 function* chunkToSSEEvents(
-  chunk: Record<string, Partial<AgentState>>
+  chunk: Record<string, Partial<AgentState>>,
+  options?: { textStreamedNodes?: Set<string> }
 ): Generator<SSEEvent> {
-  for (const u of Object.values(chunk)) {
+  for (const [nodeName, u] of Object.entries(chunk)) {
     if (!u || typeof u !== "object") continue;
+
+    const textAlreadyStreamed = options?.textStreamedNodes?.has(nodeName);
 
     if (u.status) {
       yield {
@@ -110,12 +113,15 @@ function* chunkToSSEEvents(
             }
           }
 
-          if (am.content) {
+          if (!textAlreadyStreamed && am.content) {
             yield {
               type: SSEEventType.TextDelta,
               messageId: am.id,
               content: am.content,
             };
+          }
+
+          if (am.content || textAlreadyStreamed) {
             yield { type: SSEEventType.TextEnd, messageId: am.id };
           }
         }
@@ -133,14 +139,6 @@ function* chunkToSSEEvents(
         }
       }
     }
-
-    if (typeof u.textDelta === "string" && u.textDelta) {
-      yield {
-        type: SSEEventType.TextDelta,
-        content: u.textDelta,
-        messageId: u.currentMessageId || undefined,
-      };
-    }
   }
 }
 
@@ -157,11 +155,22 @@ export async function* streamChatEvents(
 
   try {
     let hadApprovalRequest = false;
+    const textStreamedNodes = new Set<string>();
 
-    for await (const chunk of streamAgent(input, { signal })) {
-      for (const ev of chunkToSSEEvents(chunk)) {
-        if (ev.type === SSEEventType.ApprovalRequired) hadApprovalRequest = true;
-        yield ev;
+    for await (const event of streamAgent(input, { signal })) {
+      if (event.mode === "messages") {
+        const [chunk, meta] = event.data;
+        const text = typeof chunk.content === "string" ? chunk.content : "";
+        if (text) {
+          textStreamedNodes.add(meta.langgraph_node);
+          yield { type: SSEEventType.TextDelta, content: text };
+        }
+      } else {
+        for (const ev of chunkToSSEEvents(event.data, { textStreamedNodes })) {
+          if (ev.type === SSEEventType.ApprovalRequired)
+            hadApprovalRequest = true;
+          yield ev;
+        }
       }
     }
 

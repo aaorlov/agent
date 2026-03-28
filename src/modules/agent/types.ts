@@ -1,4 +1,6 @@
-import { MessageRole, ToolAction } from "./enums.js";
+import { AIMessageChunk } from "@langchain/core/messages";
+import { AgentState } from "./state";
+import { MessageRole, ToolAction } from "./enums";
 
 // ---------------------------------------------------------------------------
 // Messages — discriminated union on `role`
@@ -81,4 +83,6 @@ export interface AgentRunInput {
   resume?: AgentResume;
 }
 
-export type AgentStreamChunk = Record<string, unknown>;
+export type AgentStreamEvent =
+  | { mode: "updates"; data: Record<string, Partial<AgentState>> }
+  | { mode: "messages"; data: [AIMessageChunk, { langgraph_node: string }] };
