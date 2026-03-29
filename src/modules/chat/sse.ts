@@ -1,6 +1,6 @@
 import type { SSEStreamingApi } from "hono/streaming";
-import { streamAgent, MessageRole, AgentStatusPhase } from "@/modules/agent";
-import { CustomEventType } from "@/modules/agent/enums";
+import { streamAgent, MessageRole } from "@/modules/agent";
+import { CustomEventType, StreamMode } from "@/modules/agent/enums";
 import type { CustomEventData } from "@/modules/agent/types";
 import type {
   AgentState,
@@ -9,10 +9,9 @@ import type {
   AssistantMessage
 } from "@/modules/agent";
 
-import type { ChatRequest } from "./schemas";
-import { ChatRequestType } from "./schemas";
-import type { SSEEvent } from "./events.js";
-import { SSEEventType, FinishReason } from "./events";
+import type { ChatRequest } from "./dto/request.dto";
+import { ChatRequestType, SSEEventType, FinishReason } from "./enums";
+import type { SSEEvent } from "./events";
 import { sseEventToMessage } from "./utils";
 
 // ---------------------------------------------------------------------------
@@ -49,30 +48,11 @@ const toAgentInput = (
   return agentInput;
 }
 
-// ---------------------------------------------------------------------------
-// Agent state updates → SSE events
-// ---------------------------------------------------------------------------
-
-const STATUS_LABELS: Record<AgentStatusPhase, string> = {
-  [AgentStatusPhase.Planning]: "Planning",
-  [AgentStatusPhase.Thinking]: "Thinking",
-  [AgentStatusPhase.Executing]: "Executing tool",
-  [AgentStatusPhase.ToolResult]: "Tool result",
-};
-
 function* updateAgentStateToSSEEvents(
   chunk: Record<string, Partial<AgentState>>
 ): Generator<SSEEvent> {
   for (const [nodeName, u] of Object.entries(chunk)) {
     if (!u || typeof u !== "object") continue;
-
-    if (u.status) {
-      yield {
-        type: SSEEventType.Status,
-        code: u.status,
-        message: STATUS_LABELS[u.status],
-      };
-    }
 
     if (Array.isArray(u.pendingTools)) {
       for (const tool of u.pendingTools) {
@@ -93,7 +73,8 @@ function* updateAgentStateToSSEEvents(
         type: SSEEventType.ContextRetrieved,
         documents: u.retrievedContext.map((doc) => ({
           id: doc.id,
-          snippet: doc.content,
+          content: doc.content,
+          metadata: doc.metadata,
           score: doc.score,
         })),
       };
@@ -142,12 +123,12 @@ function* updateAgentStateToSSEEvents(
 // ---------------------------------------------------------------------------
 // Custom events → SSE events
 // ---------------------------------------------------------------------------
-function customEventToSSEEvent(
+const customEventToSSEEvent = (
   event: CustomEventData
-): SSEEvent | null {
+): SSEEvent | null => {
   switch(event.type) {
     case CustomEventType.TextDelta:
-      return { type: SSEEventType.TextDelta, content: event.content, messageId: event.messageId };
+      return { type: SSEEventType.TextDelta, content: event.content, id: event.id };
     default:
       return null;
   }
@@ -161,18 +142,19 @@ export async function* streamChatEvents(
   threadId: string,
   signal: AbortSignal
 ): AsyncGenerator<SSEEvent> {
-  const input = await toAgentInput(threadId, body);
+  const input = toAgentInput(threadId, body);
 
   try {
     let hadApprovalRequest = false;
 
     for await (const event of streamAgent(input, { signal })) {
-      if (event.mode === "custom") {
+      // Stream custom / intermediate events, not a part of chat history
+      if (event.mode === StreamMode.Custom) {
         const sseEvent = customEventToSSEEvent(event.data);
-        console.log("custom event", sseEvent);
         if(sseEvent) yield sseEvent;
-      } 
-      if(event.mode === "updates") {
+      }
+
+      if(event.mode === StreamMode.Updates) {
         for (const ev of updateAgentStateToSSEEvents(event.data)) {
           if (ev.type === SSEEventType.ApprovalRequired) hadApprovalRequest = true;
           yield ev;

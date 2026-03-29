@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { describeRoute, validator as zValidator } from "hono-openapi";
 
-import { ChatRequestSchema } from "./schemas";
+import { ChatRequestSchema } from "./dto/request.dto";
 import { handleChatStream } from "./sse";
 
 const chat = new Hono();

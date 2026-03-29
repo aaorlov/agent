@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import { HealthStatus } from "@/common/enums";
+import { HealthStatus } from "./enums";
 
 const health = new Hono();
 

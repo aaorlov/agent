@@ -1,44 +1,25 @@
-import { AgentStatusPhase, ToolAction } from "@/modules/agent/enums";
-
-export enum SSEEventType {
-  Session = "session",
-  Status = "status",
-  TextDelta = "text-delta",
-  TextEnd = "text-end",
-  ToolCall = "tool-call",
-  ToolResult = "tool-result",
-  ApprovalRequired = "approval-required",
-  ContextRetrieved = "context-retrieved",
-  Error = "error",
-  Finish = "finish",
-}
-
-export enum FinishReason {
-  Stop = "stop",
-  Approval = "approval",
-  Error = "error",
-  Abort = "abort",
-  MaxSteps = "max-steps",
-}
+import { ToolAction } from "@/modules/agent/enums";
+import { SSEEventType, FinishReason } from "./enums";
 
 export type SSEEvent =
   | { type: SSEEventType.Session; threadId: string }
-  | { type: SSEEventType.Status; code: AgentStatusPhase; message: string }
-  | { type: SSEEventType.TextDelta; content: string; messageId: string }
-  | { type: SSEEventType.TextEnd; content: string; messageId: string }
+  | { type: SSEEventType.TextDelta; content: string; id: string }
+  | { type: SSEEventType.TextEnd; content: string; id: string }
   | {
       type: SSEEventType.ToolCall;
       toolCallId: string;
       toolName: string;
       args: Record<string, unknown>;
-      messageId?: string;
+      messageId: string;
     }
   | {
       type: SSEEventType.ToolResult;
+      id: string;
       toolCallId: string;
       toolName: string;
       action: ToolAction;
-      result?: unknown;
+      result: unknown;
+      createdAt: string;
       error?: string;
     }
   | {
@@ -52,8 +33,8 @@ export type SSEEvent =
       type: SSEEventType.ContextRetrieved;
       documents: Array<{
         id: string;
-        title?: string;
-        snippet: string;
+        content: string;
+        metadata: Record<string, unknown>;
         score?: number;
       }>;
     }

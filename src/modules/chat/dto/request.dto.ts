@@ -1,10 +1,6 @@
 import { z } from "zod";
+import { ChatRequestType } from "../enums";
 import { ToolAction } from "@/modules/agent/enums";
-
-export enum ChatRequestType {
-  Message = "message",
-  ToolAction = "tool_action",
-}
 
 const SendMessageSchema = z.object({
   type: z.literal(ChatRequestType.Message),

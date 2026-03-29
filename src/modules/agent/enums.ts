@@ -5,12 +5,6 @@ export enum MessageRole {
   Tool = "tool",
 }
 
-/**
- * How a tool call was resolved.
- * - Executed: auto-executed (no approval needed)
- * - Approved / Cancelled / Skipped: human decision
- * - Error: tool errored during execution
- */
 export enum ToolAction {
   Executed = "executed",
   Approved = "approved",
@@ -19,13 +13,11 @@ export enum ToolAction {
   Error = "error",
 }
 
-export enum AgentStatusPhase {
-  Planning = "planning",
-  Thinking = "thinking",
-  Executing = "executing",
-  ToolResult = "tool_result",
-}
-
 export enum CustomEventType {
   TextDelta = "text-delta"
+}
+
+export enum StreamMode {
+  Updates = "updates",
+  Custom = "custom",
 }

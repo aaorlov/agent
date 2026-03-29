@@ -1,6 +1,5 @@
 import { Annotation } from "@langchain/langgraph";
-import type { AgentMessage, PendingTool, RetrievedDocument } from "./types.js";
-import { AgentStatusPhase } from "./enums.js";
+import type { AgentMessage, PendingTool, RetrievedDocument } from "./types";
 
 export const AgentStateAnnotation = Annotation.Root({
   messages: Annotation<AgentMessage[]>({
@@ -19,12 +18,6 @@ export const AgentStateAnnotation = Annotation.Root({
   retrievedContext: Annotation<RetrievedDocument[]>({
     reducer: (_, right) => right ?? [],
     default: () => [],
-  }),
-
-  /** Current phase for UI status events (transient — overwritten each step). */
-  status: Annotation<AgentStatusPhase | null>({
-    reducer: (_, right) => right ?? null,
-    default: () => null,
   }),
 
   /** Incremented each agent iteration. Use to cap max steps. */

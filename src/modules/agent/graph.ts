@@ -8,6 +8,7 @@ import { AgentStateAnnotation, AgentState } from "./state";
 import { AgentRunInput, AgentStreamEvent } from "./types";
 import { callModel } from "./nodes";
 import { toAgentInput } from "./utils";
+import { StreamMode } from "./enums";
 
 const checkpointer = new MemorySaver();
 
@@ -39,7 +40,7 @@ export async function* streamAgent(
   const streamOptions = {
     configurable: { thread_id: input.threadId },
     signal: options.signal,
-    streamMode: ["updates", "custom"] as ('updates' | 'custom')[],
+    streamMode: [StreamMode.Updates, StreamMode.Custom] as (StreamMode)[],
   };
 
   const agentInput = toAgentInput(input);

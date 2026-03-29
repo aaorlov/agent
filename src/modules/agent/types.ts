@@ -8,7 +8,7 @@ import { MessageRole, ToolAction, CustomEventType } from "./enums";
 
 interface MessageBase {
   id: string;
-  createdAt?: string;
+  createdAt: string;
 }
 
 export interface HumanMessage extends MessageBase {
@@ -86,7 +86,7 @@ export interface AgentRunInput {
 export interface CustomTextDelta {
   type: CustomEventType.TextDelta;
   content: string;
-  messageId: string;
+  id: string;
 }
 
 export type CustomEventData = CustomTextDelta;
